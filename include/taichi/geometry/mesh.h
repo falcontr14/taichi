@@ -56,7 +56,7 @@ struct Element {
       ret = normalized(Vector(d[1], -d[0]));
     }
     TC_STATIC_ELSE {
-      Vector n = cross(id(v[1] - v[0]), id(v[2] - v[1]));
+      Vector n = cross(v[1] - v[0], v[2] - v[1]);
       ret = normalized(n);
     }
     TC_STATIC_END_IF
@@ -102,7 +102,7 @@ struct ElementMesh {
       for (auto tri : mesh->get_triangles()) {
         Elem elem;
         for (int i = 0; i < 3; i++) {
-          elem.v[i] = id(tri.v)[i];
+          elem.v[i] = tri.v[i];
         }
         elements.push_back(elem);
       }

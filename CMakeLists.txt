@@ -6,7 +6,12 @@ cmake_minimum_required(VERSION 3.0)
 
 project(taichi)
 
-set(CMAKE_BUILD_TYPE Release)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING
+            "Choose the type of build, options are: Debug Release
+RelWithDebInfo MinSizeRel."
+            FORCE)
+endif(NOT CMAKE_BUILD_TYPE)
 
 set(TAICHI_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}/cmake/")
 
@@ -25,11 +30,5 @@ include(cmake/TaichiCXXFlags.cmake)
 include(cmake/TaichiCore.cmake)
 include(cmake/TaichiMain.cmake)
 
-set(TAICHI_PROJECT_LIBRARIES "")
-if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/projects")
-    add_subdirectory(projects)
-endif()
-
 message("C++ Flags: ${CMAKE_CXX_FLAGS}")
-message("Project libraries: ${TAICHI_PROJECT_LIBRARIES}")
-file(WRITE modules.txt "${TAICHI_PROJECT_LIBRARIES}")
+message("Build type: ${CMAKE_BUILD_TYPE}")

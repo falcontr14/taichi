@@ -83,6 +83,16 @@ static_assert(false, "32-bit Windows systems are not supported")
 #define TC_ALIGNED(x) __attribute__((aligned(x)))
 #endif
 
+#if __cplusplus >= 201703L
+#define TC_CPP17
+#else
+#if defined(TC_COMPILER_CLANG)
+static_assert(false, "For clang compilers, use -std=c++17");
+#endif
+static_assert(__cplusplus >= 201402L, "C++14 required.");
+#define TC_CPP14
+#endif
+
 // Do not disable assert...
 #ifdef NDEBUG
 #undef NDEBUG
@@ -139,7 +149,7 @@ static_assert(false, "32-bit Windows systems are not supported")
 #define TC_NAMESPACE_BEGIN namespace taichi {
 #define TC_NAMESPACE_END }
 
-TC_EXPORT void taichi_raise_assertion_failure_in_python(const char *msg);
+    TC_EXPORT void taichi_raise_assertion_failure_in_python(const char *msg);
 
 TC_NAMESPACE_BEGIN
 
@@ -151,6 +161,7 @@ class CoreState {
  public:
   bool python_imported = false;
   bool trigger_gdb_when_crash = false;
+  bool debug = false;
 
   static CoreState &get_instance();
 
@@ -160,6 +171,14 @@ class CoreState {
 
   static void set_trigger_gdb_when_crash(bool val) {
     get_instance().trigger_gdb_when_crash = val;
+  }
+
+  static void set_debug(bool val) {
+    get_instance().debug = val;
+  }
+
+  static bool get_debug() {
+    return get_instance().debug;
   }
 };
 
@@ -386,6 +405,13 @@ inline bool ends_with(std::string const &str, std::string const &ending) {
     return std::equal(ending.begin(), ending.end(), str.end() - ending.size());
 }
 
+inline bool starts_with(std::string const &str, std::string const &ending) {
+  if (ending.size() > str.size())
+    return false;
+  else
+    return std::equal(ending.begin(), ending.end(), str.begin());
+}
+
 TC_NAMESPACE_END
 
 //******************************************************************************
@@ -410,7 +436,7 @@ void trash(T &&t) {
 class DeferedExecution {
   std::function<void(void)> statement;
 
-public:
+ public:
   DeferedExecution(const std::function<void(void)> &statement)
       : statement(statement) {
   }
@@ -420,7 +446,7 @@ public:
   }
 };
 
-#define TC_DEFER(x) taichi::DeferedExecution _defered([&]() {x;});
+#define TC_DEFER(x) taichi::DeferedExecution _defered([&]() { x; });
 
 inline bool running_on_windows() {
 #if defined(TC_PLATFORM_WINDOWS)
@@ -430,26 +456,37 @@ inline bool running_on_windows() {
 #endif
 }
 
-inline std::string get_repo_dir() {
-  auto dir = std::getenv("TAICHI_REPO_DIR");
-  TC_ASSERT_INFO(dir != nullptr,
-                 "TAICHI_REPO_DIR is not specified in environment variables.");
-  return std::string(dir);
+bool is_release();
+
+std::string get_repo_dir();
+
+std::string get_python_package_dir();
+
+void set_python_package_dir(const std::string &dir);
+
+inline std::string assets_dir() {
+  return get_repo_dir() + "/assets/";
 }
 
 inline std::string absolute_path(std::string path) {
-  // If 'path' is actually relative to TAICHI_REPO_DIR, convert it to an absolute one.
-  // There are three types of paths:
+  // If 'path' is actually relative to TAICHI_REPO_DIR, convert it to an
+  // absolute one. There are three types of paths:
   //    A. Those who start with / or "C:/" are absolute paths
   //    B. Those who start with "." are relative to cwd
-  //    C. Others are relative to $ENV{TAICHI_REPO_DIR}
+  //    C. Those who start with "$" are relative to assets_dir()
+  //    D. Others are relative to $ENV{TAICHI_REPO_DIR}
 
-  // Here we convert type C paths to absolute paths.
-  if (path[0] != '.' && path[0] !='/' && (path.size() >= 2 && path[1] != ':')) {
-    path = std::string(std::getenv("TAICHI_REPO_DIR")) + "/" + path;
+  TC_ASSERT(!path.empty());
+  if (path[0] == '$') {
+    path = assets_dir() + path.substr(1, (int)path.size() - 1);
+  } else if (path[0] != '.' && path[0] != '/' &&
+             (path.size() >= 2 && path[1] != ':')) {
+    path = get_repo_dir() + "/" + path;
   }
   return path;
 }
+
+std::string cpp_demangle(const std::string &mangled_name);
 
 TC_NAMESPACE_END
 

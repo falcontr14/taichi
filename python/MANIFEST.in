@@ -3,8 +3,9 @@ include MANIFEST.in
 include *.txt
 include *.py
 include *.cfg
+include taichi/lib/taichi_core.so
+include taichi/include/*
+include taichi/include/taichi/*
 
-
-recursive-include examples *.py
-
-global-exclude *.pyc *.pyo *.pyd *.so *.dll *.lib
+global-exclude *.pyc *.pyo *.pyd
+global-exclude ffmpeg

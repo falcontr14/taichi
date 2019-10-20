@@ -52,7 +52,7 @@ class AngularVelocity {
       ret = Vector(-input.y, input.x) * value;
     }
     TC_STATIC_ELSE {
-      ret = taichi::cross(id(value), id(input));
+      ret = taichi::cross(value, input);
     }
     TC_STATIC_END_IF;
     return ret;
@@ -77,19 +77,18 @@ class Rotation {
       value = 0;
     }
     TC_STATIC_ELSE {
-      value = id(Eigen::Quaternion<real>(1, 0, 0, 0));
+      value = Eigen::Quaternion<real>(1, 0, 0, 0);
     }
     TC_STATIC_END_IF
-    return;
   }
 
   explicit Rotation(real value) {
     // according to dim
     TC_STATIC_IF(dim == 2) {
-      id(this->value) = value;
+      this->value = value;
     }
     TC_STATIC_ELSE {
-      id(this->value) = Eigen::Quaternion<real>(1, 0, 0, 0);
+      this->value = Eigen::Quaternion<real>(1, 0, 0, 0);
     }
     TC_STATIC_END_IF
     return;
@@ -106,13 +105,13 @@ class Rotation {
   Matrix get_rotation_matrix() const {
     Matrix ret;
     TC_STATIC_IF(dim == 2) {
-      ret[0][0] = std::cos(id(value));
-      ret[1][0] = -std::sin(id(value));
-      ret[0][1] = std::sin(id(value));
-      ret[1][1] = std::cos(id(value));
+      ret[0][0] = std::cos(value);
+      ret[1][0] = -std::sin(value);
+      ret[0][1] = std::sin(value);
+      ret[1][1] = std::cos(value);
     }
     TC_STATIC_ELSE {
-      auto mat = id(value).toRotationMatrix();
+      auto mat = value.toRotationMatrix();
       for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
           ret[i][j] = mat(j, i);
@@ -125,10 +124,10 @@ class Rotation {
 
   void apply_angular_velocity(const AngVel &vel, real dt) {
     TC_STATIC_IF(dim == 2) {
-      value += id(dt * vel.value);
+      value += dt * vel.value;
     }
     TC_STATIC_ELSE {
-      Vector3 axis(id(vel).value[0], id(vel).value[1], id(vel).value[2]);
+      Vector3 axis(vel.value[0], vel.value[1], vel.value[2]);
       real angle = length(axis);
       if (angle < 1e-10_f) {
         return;
@@ -138,7 +137,7 @@ class Rotation {
       real s = std::sin(ot / 2);
       real c = std::cos(ot / 2);
       Eigen::Quaternion<real> omega_t(c, s * axis[0], s * axis[1], s * axis[2]);
-      value = id(omega_t) * value;
+      value = omega_t * value;
     }
     TC_STATIC_END_IF
     return;

@@ -73,6 +73,9 @@ class Unit {
     TC_NOT_IMPLEMENTED;
     return "";
   }
+
+  virtual ~Unit() {
+  }
 };
 
 #define TC_IMPLEMENTATION_HOLDER_NAME(T) ImplementationHolder_##T
@@ -113,7 +116,8 @@ class InterfaceHolder {
 
 #define TC_INTERFACE(T)                                                       \
   extern void *get_implementation_holder_instance_##T();                      \
-  class TC_IMPLEMENTATION_HOLDER_NAME(T) : public ImplementationHolderBase {  \
+  class TC_IMPLEMENTATION_HOLDER_NAME(T) final                                \
+      : public ImplementationHolderBase {                                     \
    public:                                                                    \
     TC_IMPLEMENTATION_HOLDER_NAME(T)(const std::string &name) {               \
       this->name = name;                                                      \

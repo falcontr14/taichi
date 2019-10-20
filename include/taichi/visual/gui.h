@@ -73,6 +73,7 @@ class Canvas {
     Vector4 _color;
     real _radius;
     int n_vertices;
+    bool finished;
     static Vector2 vertices[128];  // TODO: ...
 
     TC_FORCE_INLINE Line(Canvas &canvas)
@@ -80,6 +81,7 @@ class Canvas {
           _color(canvas.context._color),
           _radius(canvas.context._radius) {
       n_vertices = 0;
+      finished = false;
     }
 
     TC_FORCE_INLINE Line(Canvas &canvas, Vector2 a, Vector2 b) : Line(canvas) {
@@ -180,8 +182,12 @@ class Canvas {
       auto radius_i = (int)std::ceil(_radius + 0.5_f);
       auto range_lower = Vector2i(std::min(a_i.x, b_i.x) - radius_i,
                                   std::min(a_i.y, b_i.y) - radius_i);
+      range_lower(0) = std::max(0, range_lower(0));
+      range_lower(1) = std::max(0, range_lower(1));
       auto range_higher = Vector2i(std::max(a_i.x, b_i.x) + radius_i,
                                    std::max(a_i.y, b_i.y) + radius_i);
+      range_higher(0) = std::min(canvas.img.get_width(), range_higher(0));
+      range_higher(1) = std::min(canvas.img.get_height(), range_higher(1));
       auto direction = normalized(b - a);
       auto l = length(b - a);
       auto tangent = Vector2(-direction.y, direction.x);
@@ -201,7 +207,9 @@ class Canvas {
       }
     }
 
-    TC_FORCE_INLINE ~Line() {
+    void finish() {
+      TC_ASSERT(!finished);
+      finished = true;
       for (int i = 0; i + 1 < n_vertices; i++) {
         stroke(canvas.transform(vertices[i]),
                canvas.transform(vertices[i + 1]));
@@ -214,12 +222,14 @@ class Canvas {
     Vector2 _center;
     Vector4 _color;
     real _radius;
+    bool finished;
 
     TC_FORCE_INLINE Circle(Canvas &canvas, Vector2 center)
         : canvas(canvas),
           _center(center),
           _color(canvas.context._color),
           _radius(canvas.context._radius) {
+      finished = false;
     }
 
     TC_FORCE_INLINE Circle &color(Vector4 color) {
@@ -246,19 +256,31 @@ class Canvas {
       return *this;
     }
 
-    TC_FORCE_INLINE ~Circle() {
+    void finish() {
+      TC_ASSERT(finished == false);
+      finished = true;
       auto center = canvas.transform(_center);
       auto center_i = (center + Vector2(0.5_f)).template cast<int>();
       auto radius_i = (int)std::ceil(_radius + 0.5_f);
       for (int i = -radius_i; i <= radius_i; i++) {
         for (int j = -radius_i; j <= radius_i; j++) {
-          real dist =
-              length(center - center_i.template cast<real>() - Vector2(i, j));
-          auto alpha = _color.w * clamp(_radius - dist);
-          auto &dest = canvas.img[center_i + Vector2i(i, j)];
-          dest = lerp(alpha, dest, _color);
+          if (0 <= center_i(0) + i &&
+              center_i(0) + i < canvas.img.get_width() &&
+              0 <= center_i(1) + j &&
+              center_i(1) + j < canvas.img.get_height()) {
+            real dist =
+                length(center - center_i.template cast<real>() - Vector2(i, j));
+            auto alpha = _color.w * clamp(_radius - dist);
+            auto &dest = canvas.img[center_i + Vector2i(i, j)];
+            dest = lerp(alpha, dest, _color);
+          }
         }
       }
+    }
+
+    TC_FORCE_INLINE ~Circle() {
+      if (!finished)
+        finish();
     }
   };
 
@@ -274,36 +296,47 @@ class Canvas {
     return Vector2(transform_matrix * Vector3(x, 1.0_f));
   }
 
-  Circle circle(Vector2 center) {
-    return Circle(*this, center);
+  std::vector<Circle> circles;
+  std::vector<Line> lines;
+
+  Circle &circle(Vector2 center) {
+    circles.emplace_back(*this, center);
+    return circles.back();
   }
 
-  Circle circle(real x, real y) {
-    return Circle(*this, Vector2(x, y));
+  Circle &circle(real x, real y) {
+    circles.emplace_back(*this, Vector2(x, y));
+    return circles.back();
   }
 
-  Line path(real xa, real ya, real xb, real yb) {
+  Line &path(real xa, real ya, real xb, real yb) {
     return path(Vector2(xa, ya), Vector2(xb, yb));
   }
 
-  Line path() {
-    return Line(*this);
+  Line &path() {
+    lines.emplace_back(*this);
+    return lines.back();
   }
 
-  Line path(Vector2 a, Vector2 b) {
-    return Line(*this).path(a, b);
+  Line &path(Vector2 a, Vector2 b) {
+    lines.emplace_back(*this);
+    lines.back().path(a, b);
+    return lines.back();
   }
 
-  Line path(Vector2 a, Vector2 b, Vector2 c) {
-    return Line(*this, a, b, c);
+  Line &path(Vector2 a, Vector2 b, Vector2 c) {
+    lines.emplace_back(*this, a, b, c);
+    return lines.back();
   }
 
-  Line path(Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
-    return Line(*this, a, b, c, d);
+  Line &path(Vector2 a, Vector2 b, Vector2 c, Vector2 d) {
+    lines.emplace_back(*this, a, b, c, d);
+    return lines.back();
   }
 
-  Line rect(Vector2 a, Vector2 b) {
-    return Line(*this, a, Vector2(a.x, b.y), b, Vector2(b.x, a.y));
+  Line &rect(Vector2 a, Vector2 b) {
+    lines.emplace_back(*this, a, Vector2(a.x, b.y), b, Vector2(b.x, a.y));
+    return lines.back();
   }
 
   void line(Vector2 start, Vector2 end, Vector4 color) {
@@ -356,16 +389,17 @@ class Canvas {
             Vector4 color) {
     position = transform(position);
 #if defined(TC_AMALGAMATED)
-    auto ttf_path = std::string(""); // use amalgamated font
+    auto ttf_path = std::string("");  // use amalgamated font
 #else
-    char *root_dir = std::getenv("TAICHI_REPO_DIR");
-    TC_ASSERT(root_dir != nullptr);
+    std::string root_dir = get_repo_dir();
     auto ttf_path = root_dir + std::string("/assets/fonts/go/Go-Regular.ttf");
 #endif
     img.write_text(ttf_path, str, size, position.x, position.y, color);
   }
 
   void clear(Vector4 color) {
+    circles.clear();
+    lines.clear();
     img.reset(color);
   }
 
@@ -496,6 +530,9 @@ class GUI : public GUIBase {
 
     void set_hover(bool val) {
       hover = val;
+    }
+
+    virtual ~Widget() {
     }
   };
 
@@ -708,10 +745,13 @@ class GUI : public GUIBase {
   void set_title(std::string title);
 
   void redraw_widgets() {
+    auto old_transform_matrix = canvas->transform_matrix;
+    canvas->set_idendity_transform_matrix();
     for (auto &w : widgets) {
       w->set_hover(w->inside(cursor_pos));
       w->redraw(*canvas);
     }
+    canvas->transform_matrix = old_transform_matrix;
   }
 
   void update() {

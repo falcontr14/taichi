@@ -11,6 +11,8 @@
 
 TC_NAMESPACE_BEGIN
 
+void export_lang(py::module &m);
+
 PYBIND11_MODULE(taichi_core, m) {
   m.doc() = "taichi_core";
 
@@ -19,10 +21,10 @@ PYBIND11_MODULE(taichi_core, m) {
   }
 
   export_math(m);
-  export_dynamics(m);
   export_visual(m);
   export_io(m);
   export_misc(m);
+  export_lang(m);
 }
 
 TC_NAMESPACE_END

@@ -1,29 +1,20 @@
 import sys
 import os
 import shutil
+import time
 import random
 from taichi.tools.video import make_video, interpolate_frames
-from taichi.core.util import get_projects, activate_package, deactivate_package
 
-packages = {
-  'mpm': 'https://github.com/yuanming-hu/taichi_mpm',
-  'wushi': 'https://github.com/yuanming-hu/taichi_wushi'
-}
-
-def print_all_projects():
-  from colorama import Fore, Back, Style
-  print(Fore.GREEN, end='')
-  print("Active projects:")
-  projs = get_projects(active=True)
-  for p in projs:
-    print('    {}'.format(p))
-
-  print(Fore.BLUE, end='')
-  projs = get_projects(active=False)
-  print("Inactive projects:")
-  for p in projs:
-    print('    {}'.format(p))
-  print(Fore.RESET, end='')
+def run_pytest():
+  print("\nRunning python tests...\n")
+  # TODO: for some reason the python tests piss off cpp tests. Need to fix.
+  def test_python():
+    import taichi as ti
+    import pytest
+    pytest.main([os.path.join(ti.get_repo_directory(), 'tests')])
+    ti.reset()
+  test_python()
+    
 
 def plot(fn):
   import matplotlib.pyplot as plt
@@ -51,14 +42,14 @@ def plot(fn):
   plt.ylim(0, max(M) * 1.2)
   plt.show()
 
-def main():
+def main(debug=False):
   lines = []
   print()
   lines.append(u'{:^43}'.format(u' '.join([u'\u262f'] * 8)))
   lines.append(u' *******************************************')
   lines.append(u' **                Taichi                 **')
   lines.append(u' **                ~~~~~~                 **')
-  lines.append(u' ** Open Source Computer Graphics Library **')
+  lines.append(u' ** High-Performance Programming Language **')
   lines.append(u' *******************************************')
   lines.append(u'{:^43}'.format(u"\u2630 \u2631 \u2632 \u2633 "
                                 "\u2634 \u2635 \u2636 \u2637"))
@@ -66,49 +57,43 @@ def main():
   print()
   import taichi as tc
 
+  tc.tc_core.set_core_debug(debug)
+
   argc = len(sys.argv)
   if argc == 1 or sys.argv[1] == 'help':
     print(
-        "    Usage: ti run [task name]        |-> Run a specific task\n"
-        "           ti test                   |-> Run tests\n"
-        "           ti daemon                 |-> Start daemon process\n"
-        "           ti install                |-> Install package\n"
-        "           ti proj                   |-> List all projects\n"
-        "           ti proj activate [name]   |-> Activate project\n"
-        "           ti proj deactivate [name] |-> Deactivate project\n"
-        "           ti build                  |-> Build C++ files\n"
-        "           ti amal                   |-> Generate amalgamated taichi.h\n"
-        "           ti clean asm [*.s]        |-> Clean up gcc ASM\n"
-        "           ti plot [*.txt]           |-> Plot a memory usage curve\n"
-        "           ti update                 |-> Update taichi and projects\n"
-        "           ti video                  |-> Make a video using *.png files in the current folder\n"
-        "           ti convert                |-> Delete color controllers in a log file\n"
-        "           ti exec                   |-> Invoke a executable in the 'build' folder\n"
-        "           ti format                 |-> Format taichi and projects\n"
-        "                                         (C++ source and python scripts)\n"
-        "           ti statement [statement]  |-> Execute a single statement (with taichi imported as tc\n"
-        "           ti [script.py]            |-> Run script\n"
-        "           ti doc                    |-> Build documentation\n"
-        "           ti merge                  |-> Merge images in folders horizontally\n"
-        "           ti debug [script.py]      |-> Debug script\n")
+      "    Usage: ti run [task name]        |-> Run a specific task\n"
+      "           ti test                   |-> Run tests\n"
+      "           ti install                |-> Install package\n"
+      "           ti build                  |-> Build C++ files\n"
+      "           ti amal                   |-> Generate amalgamated taichi.h\n"
+      "           ti clean asm [*.s]        |-> Clean up gcc ASM\n"
+      "           ti plot [*.txt]           |-> Plot a memory usage curve\n"
+      "           ti video                  |-> Make a video using *.png files in the current folder\n"
+      "           ti convert                |-> Delete color controllers in a log file\n"
+      "           ti exec                   |-> Invoke a executable in the 'build' folder\n"
+      "           ti format                 |-> Format taichi and projects\n"
+      "                                         (C++ source and python scripts)\n"
+      "           ti statement [statement]  |-> Execute a single statement (with taichi imported as tc\n"
+      "           ti [script.py]            |-> Run script\n"
+      "           ti doc                    |-> Build documentation\n"
+      "           ti merge                  |-> Merge images in folders horizontally\n"
+      "           ti debug [script.py]      |-> Debug script\n")
     exit(-1)
   mode = sys.argv[1]
 
+  t = time.time()
   if mode.endswith('.py'):
     with open(mode) as script:
       script = script.read()
     exec(script, {'__name__': '__main__'})
-    exit()
-
-  if mode.endswith('.cpp'):
+  elif mode.endswith('.cpp'):
     command = 'g++ {} -o {} -g -std=c++14 -O3 -lX11 -lpthread'.format(mode, mode[:-4])
     print(command)
     ret = os.system(command)
     if ret == 0:
       os.system('./{}'.format(mode[:-4]))
-    exit()
-
-  if mode == "run":
+  elif mode == "run":
     if argc <= 2:
       print("Please specify [task name], e.g. test_math")
       exit(-1)
@@ -124,27 +109,10 @@ def main():
     with open(name) as script:
       script = script.read()
     exec(script, {'__name__': '__main__'})
-    exit()
-  elif mode == "daemon":
-    from taichi.system.daemon import start
-    if len(sys.argv) > 2:
-      # Master daemon
-      start(True)
-    else:
-      # Slave daemon
-      start(False)
-  elif mode == "proj":
-    if len(sys.argv) == 2:
-      print_all_projects()
-    elif sys.argv[2] == 'activate':
-      proj = sys.argv[3]
-      activate_package(proj)
-    elif sys.argv[2] == 'deactivate':
-      proj = sys.argv[3]
-      deactivate_package(proj)
-    else:
-      assert False
   elif mode == "test":
+    if len(sys.argv) == 2:
+      run_pytest()
+    print("Running C++ tests...")
     task = tc.Task('test')
     task.run(*sys.argv[2:])
   elif mode == "build":
@@ -157,16 +125,6 @@ def main():
     plot(sys.argv[2])
   elif mode == "update":
     tc.core.update(True)
-    tc.core.build()
-  elif mode == "install":
-    os.chdir(tc.get_directory('projects'))
-    pkg = sys.argv[2]
-    if pkg not in packages:
-      tc.error('package {} not found.'.format(pkg))
-    else:
-      tc.info('Installing package {}...'.format(pkg))
-      url = packages[pkg]
-    os.system('git clone {} {}'.format(url, pkg))
     tc.core.build()
   elif mode == "asm":
     fn = sys.argv[2]
@@ -187,7 +145,6 @@ def main():
     exec(script, {'__name__': '__main__'})
     os.chdir(cwd)
     shutil.copy(os.path.join(tc.get_repo_directory(), 'build/taichi.h'), './taichi.h')
-    exit()
   elif mode == "doc":
     os.system('cd docs && sphinx-build -b html . build')
   elif mode == "video":
@@ -231,6 +188,8 @@ def main():
     print('Running task [{}]...'.format(name))
     task = tc.Task(name)
     task.run(*sys.argv[2:])
+  print()
+  print(">>> Running time: {:.2f}s".format(time.time() - t))
 
 if __name__ == '__main__':
   main()

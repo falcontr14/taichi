@@ -35,11 +35,8 @@ import ctypes
 
 def config_from_dict(args):
   from taichi.core import tc_core
-  from taichi.visual import SurfaceMaterial
   d = copy.copy(args)
   for k in d:
-    if isinstance(d[k], SurfaceMaterial):
-      d[k] = d[k].id
     if isinstance(d[k], tc_core.Vector2f):
       d[k] = '({}, {})'.format(d[k].x, d[k].y)
     if isinstance(d[k], tc_core.Vector3f):
@@ -53,13 +50,13 @@ def make_polygon(points, scale):
   polygon = tc.core.Vector2fList()
   for p in points:
     if type(p) == list or type(p) == tuple:
-      polygon.append(scale * Vector(p[0], p[1]))
+      polygon.append(scale * vec(p[0], p[1]))
     else:
       polygon.append(scale * p)
   return polygon
 
 
-def Vectori(*args):
+def veci(*args):
   from taichi.core import tc_core
   if isinstance(args[0], tc_core.Vector2i):
     return args[0]
@@ -78,7 +75,7 @@ def Vectori(*args):
     assert False, type(args[0])
 
 
-def Vector(*args):
+def vec(*args):
   from taichi.core import tc_core
   if isinstance(args[0], tc_core.Vector2f):
     return args[0]
@@ -213,14 +210,14 @@ def P(**kwargs):
 
 def imread(fn, bgr=False):
   img = taichi.core.Array2DVector3(
-      taichi.Vectori(0, 0), taichi.Vector(0.0, 0.0, 0.0))
+      taichi.veci(0, 0), taichi.vec(0.0, 0.0, 0.0))
   img.read(fn)
   return image_buffer_to_ndarray(img, bgr)[::-1]
 
 
 def read_image(fn, linearize=False):
   img = taichi.core.Array2DVector3(
-      taichi.Vectori(0, 0), taichi.Vector(0.0, 0.0, 0.0))
+      taichi.veci(0, 0), taichi.vec(0.0, 0.0, 0.0))
   img.read(fn, linearize)
   return img
 
@@ -276,48 +273,6 @@ def sleep(seconds=-1):
       time.sleep(1)  # Wait for Ctrl-C
   else:
     time.sleep(seconds)
-
-
-functions = []
-function_addresses = []
-
-
-def get_function_XY(x, y):
-
-  def functionXY(f):
-    func = getattr(taichi.core, 'function{}{}_from_py_obj'.format(x, y))(f)
-    functions.append(f)
-    functions.append(func)
-    function_address = getattr(taichi.core, 'get_function{}{}_address'.format(
-        x, y))(
-            func)
-    function_addresses.append(function_address)
-    return function_address
-
-  return functionXY
-
-
-function11 = get_function_XY(1, 1)
-function12 = get_function_XY(1, 2)
-function13 = get_function_XY(1, 3)
-
-
-def constant_function(v):
-  if isinstance(v, int) or isinstance(v, float):
-    return function11(lambda t: v)
-  if isinstance(v, tuple):
-    v = taichi.Vector(*v)
-  if isinstance(v, taichi.core.Vector2f):
-    return function12(lambda t: v)
-  elif isinstance(v, taichi.core.Vector3f):
-    return function13(lambda t: v)
-  else:
-    assert False
-
-
-def constant_function13(v):
-  return function13(lambda t: v)
-
 
 class Tee():
 
@@ -402,10 +357,10 @@ def redirect_print_to_log():
 
 
 def duplicate_stdout_to_file(fn):
-  taichi.core.duplicate_stdout_to_file(fn)
+  taichi.tc_core.duplicate_stdout_to_file(fn)
   
 def set_logging_level(level):
-  taichi.core.set_logging_level(level)
+  taichi.tc_core.set_logging_level(level)
   
 def set_gdb_trigger(on=True):
-  taichi.core.set_core_trigger_gdb_when_crash(on)
+  taichi.tc_core.set_core_trigger_gdb_when_crash(on)

@@ -1,0 +1,4 @@
+*.ptx
+sample
+*.ll
+*.s
